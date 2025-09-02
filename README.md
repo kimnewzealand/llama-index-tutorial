@@ -39,6 +39,12 @@ This is a tutorial for using LlamaIndex with HuggingFace.
 - **Enterprise Features**: Production-ready vs experimental/prototype-focused
 - **Proven Security**: Established security patterns vs newer, less tested approach
 
+LlamaIndex supports three main types of reasoning agents:
+
+1. Function Calling Agents - These work with AI models that can call specific functions.
+2. ReAct Agents - These can work with any AI that does chat or text endpoint and deal with complex reasoning tasks.
+3. Advanced Custom Agents - These use more complex methods to deal with more complex tasks and workflows.
+
 See tutorial https://huggingface.co/learn/agents-course/en/unit2/llama-index/introduction
 Code has been updated to follow pythonic async/await pattern
 
