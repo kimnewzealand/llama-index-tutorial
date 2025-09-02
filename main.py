@@ -77,6 +77,9 @@ from llama_index.core.evaluation import FaithfulnessEvaluator
 from llama_index.core.tools import QueryEngineTool
 from llama_index.core.agent.workflow import AgentWorkflow
 from llama_index.core.workflow import Context
+from llama_index.core.agent import ReActAgent
+# from llama_index.core.utils import draw_all_possible_flows
+
 
 # Configure logging
 logging.basicConfig(
@@ -220,17 +223,23 @@ class RAGApplication:
                     temperature=0.7,
                     max_tokens=100,
                     token=self.hf_token,
-                    provider="hyperbolic"
+                    provider="auto"
                 )
 
-                # Register the client for cleanup
-                if hasattr(self.llm, '_client'):
-                    register_client_for_cleanup(self.llm._client)
-                if hasattr(self.llm, '_async_client'):
-                    register_client_for_cleanup(self.llm._async_client)
+                # Test the LLM
+                if self.test_llm():
+                    logger.info("RAG application is ready for use!")
 
-                logger.info(f"✅ Successfully initialized free LLM: {model}")
-                return True
+                    # Register the client for cleanup
+                    if hasattr(self.llm, '_client'):
+                        register_client_for_cleanup(self.llm._client)
+                    if hasattr(self.llm, '_async_client'):
+                        register_client_for_cleanup(self.llm._async_client)
+
+                    logger.info(f"✅ Successfully initialized free LLM: {model}")
+                    return True
+                else:
+                    continue
             except Exception as e:
                 logger.warning(f"❌ Failed to initialize {model}: {e}")
                 continue
@@ -348,22 +357,16 @@ class RAGApplication:
             if not self.setup_llm():
                 logger.error("Failed to setup LLM for testing")
                 return
-
+        result=False
         try:
             logger.info(f"Testing LLM with prompt: {prompt}")
             response = self.llm.complete(prompt)
             logger.info(f"✅ Test passed LLM Response: {response}")
+            result=True
+            return result
         except Exception as e:
             logger.error(f"❌ LLM test failed: {e}")
-            logger.info("Attempting to reinitialize LLM...")
-            if self.setup_llm():
-                try:
-                    response = self.llm.complete(prompt)
-                    logger.info(f"LLM Response after reinit: {response}")
-                except Exception as retry_e:
-                    logger.error(f"❌LLM test failed even after reinit: {retry_e}")
-            else:
-                logger.error("Failed to reinitialize LLM")
+            return result
 
     async def cleanup(self) -> None:
         """Clean up resources and close any open sessions."""
@@ -456,9 +459,6 @@ async def main() -> None:
         rag_app = RAGApplication(hf_token)
 
         if rag_app.initialize():
-            # Test the LLM
-            rag_app.test_llm()
-            logger.info("RAG application is ready for use!")
 
             # Load data
             rag_app.load_data()
@@ -466,11 +466,23 @@ async def main() -> None:
             # Query the index
             logger.info("RAG Stage 4 - Querying the index")
             query_engine = rag_app.index.as_query_engine(
-                    llm=rag_app.llm,
-                    response_mode="tree_summarize",
+                llm=rag_app.llm,
+                response_mode="tree_summarize",
+                similarity_top_k=3,  # Retrieve top 3 most relevant chunks
+                verbose=True  # Enable verbose mode to see what's being retrieved
             )
-            response = query_engine.query("🔍How many levels of data classification are there?")
-            print(response)
+            # Test the query engine with document-specific questions
+            logger.info("🔍 Testing query engine with document content...")
+
+            query1 = "How many levels of data classification are there?"
+            response = query_engine.query(query1)
+            print(f"📄 Query Engine Response: {response}")
+
+            # Test with more specific question
+            query2 = "What are the three levels of data classification mentioned in the document?"
+            response2 = query_engine.query(query2)
+            print(f"📄 Specific Query Response: {response2}")
+
             logger.info("RAG Stage 5 - Evaluating the response")
             evaluator = FaithfulnessEvaluator(llm=rag_app.llm)
             eval_result = evaluator.evaluate_response(response=response)
@@ -481,25 +493,59 @@ async def main() -> None:
         try:
             # Use AgentWorkFlow, an orchestrator for running a system of one or more agents.
             logger.info("Initializing agent...")
-            query_tool = QueryEngineTool.from_defaults(query_engine, name="Query engine tool", description="tool to use to answer questions on the compliance policies")
-            agent = AgentWorkflow.from_tools_or_functions(
-                [query_tool],
+            # Create a more specific query tool that forces the agent to use the document
+            query_tool = QueryEngineTool.from_defaults(
+                query_engine,
+                name="document_query_tool",
+                description="REQUIRED: Use this tool to search and retrieve information from the loaded compliance documents. This tool has access to the actual document content including data classification levels. Always use this tool for any questions about data classification, compliance policies, or document content."
+            )
+
+            # Create ReActAgent with explicit instructions to use the tool
+            query_agent = ReActAgent(
+                name="query_agent",
+                description="A specialized agent that queries compliance documents using the document_query_tool",
+                system_prompt="""You are a helpful assistant that MUST use the document_query_tool to answer questions about data classification and compliance policies.
+
+IMPORTANT INSTRUCTIONS:
+1. ALWAYS use the document_query_tool for any questions about data classification, compliance, or policy information
+2. DO NOT provide generic answers - only use information retrieved from the documents
+3. If the tool returns specific information from the document, use that exact information in your response
+4. Always cite that your answer comes from the loaded compliance documents
+5. If you cannot find specific information in the documents, say so explicitly
+
+Remember: You have access to actual compliance documents through the document_query_tool - use it!""",
+                tools=[query_tool],
                 llm=rag_app.llm,
             )
-            logger.info("Agent initialized successfully!")
+
+            # Create the workflow with ReActAgent
+            agent = AgentWorkflow(
+                agents=[query_agent],
+                root_agent="query_agent",
+            )
+
+            # Draw workflow diagram if utilities are available
+            # try:
+            #     draw_all_possible_flows(agent, "flow.html")
+            # except:
+            #     logger.info("Workflow visualization not available)")
+
+            logger.info("Agent workflow initialized successfully!")
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
         try:
             #  Agents are stateless by default however, they can remember past interactions using a Context object
-            logger.info(" Running agent...")
+            logger.info("Running agent workflow...")
 
             # Create context for the agent
             ctx = Context(agent)
 
-            # First query with proper async handling
-            logger.info("🔍 Asking: How many levels of data classification are there?")
+            # Update query to be more specific and force tool usage
+            agent_query1 = "According to the loaded compliance document, how many levels of data classification are there? Please use the document_query_tool to find this specific information from the document."
+            logger.info(f"🔍 Asking: {agent_query1}")
             try:
-                result = await agent.run("How many levels of data classification are there?", ctx=ctx)
+                # Run the agent workflow
+                result = await agent.run(agent_query1, ctx=ctx)
                 if hasattr(result, 'response'):
                     print(f"🎯 Agent response: {result.response}")
                 elif hasattr(result, 'content'):
@@ -507,25 +553,21 @@ async def main() -> None:
                 else:
                     print(f"🎯 Agent result: {result}")
 
-                # Immediate cleanup after first query to prevent session buildup
-                await rag_app.cleanup()
-                await asyncio.sleep(0.5)  # Allow cleanup to complete
-
             except Exception as query_error:
                 logger.error(f"First query failed: {query_error}")
                 # Try without context as fallback
                 try:
-                    result = await agent.run("How many levels of data classification are there?")
+                    result = await agent.run(query1)
                     print(f"🎯 Agent response (no context): {result}")
                 except Exception as fallback_error:
                     logger.error(f"Fallback query also failed: {fallback_error}")
 
-            # Second query with fresh session
-            logger.info("🔍 Asking: Why are there 3 levels of data classification?")
+            agent_query2 = "Based on the compliance document, why are there 3 levels of data classification? Please use the document_query_tool to find the specific reasoning from the loaded document."
+            logger.info(f"🔍 Asking: {agent_query2}")
             try:
                 # Create fresh context to avoid session conflicts
                 ctx2 = Context(agent)
-                result = await agent.run("Why are there 3 levels of data classification?", ctx=ctx2)
+                result = await agent.run(agent_query2, ctx=ctx2)
                 if hasattr(result, 'response'):
                     print(f"🎯 Agent response: {result.response}")
                 elif hasattr(result, 'content'):
@@ -539,7 +581,7 @@ async def main() -> None:
                 # Try direct query engine as fallback
                 try:
                     logger.info("🔧 Trying direct query engine...")
-                    direct_response = query_engine.query("Why are there 3 levels of data classification?")
+                    direct_response = query_engine.query(query2)
                     print(f"🔧 Direct query engine response: {direct_response}")
                 except Exception as direct_error:
                     logger.error(f"Direct query engine also failed: {direct_error}")
@@ -554,7 +596,7 @@ async def main() -> None:
             # Try direct query engine as fallback
             try:
                 logger.info("Testing query engine directly...")
-                direct_response = query_engine.query("How many levels of data classification are there?")
+                direct_response = query_engine.query(query1)
                 print(f"🔧 Direct query engine response: {direct_response}")
             except Exception as direct_error:
                 logger.error(f"Direct query engine also failed: {direct_error}")

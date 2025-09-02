@@ -46,7 +46,8 @@ LlamaIndex supports three main types of reasoning agents:
 3. Advanced Custom Agents - These use more complex methods to deal with more complex tasks and workflows.
 
 See tutorial https://huggingface.co/learn/agents-course/en/unit2/llama-index/introduction
-Code has been updated to follow pythonic async/await pattern
+
+Code has been updated to follow pythonic async/await pattern.
 
 ## Setup
 
