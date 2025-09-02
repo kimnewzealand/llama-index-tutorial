@@ -45,7 +45,7 @@ LlamaIndex supports three main types of reasoning agents:
 2. ReAct Agents - These can work with any AI that does chat or text endpoint and deal with complex reasoning tasks.
 3. Advanced Custom Agents - These use more complex methods to deal with more complex tasks and workflows.
 
-##🚨 LlamaIndex Pitfalls from This Project (Summary provided by Augment Code)
+## 🚨 LlamaIndex Pitfalls from This Project (Summary provided by Augment Code)
 
 Import & Dependency Issues
 • Inconsistent module paths - Functions move between versions (draw_all_possible_flows location varies)
