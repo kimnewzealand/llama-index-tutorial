@@ -45,9 +45,50 @@ LlamaIndex supports three main types of reasoning agents:
 2. ReAct Agents - These can work with any AI that does chat or text endpoint and deal with complex reasoning tasks.
 3. Advanced Custom Agents - These use more complex methods to deal with more complex tasks and workflows.
 
+##🚨 LlamaIndex Pitfalls from This Project (Summary provided by Augment Code)
+
+Import & Dependency Issues
+• Inconsistent module paths - Functions move between versions (draw_all_possible_flows location varies)
+• Missing dependencies - Required packages not always included in base installation
+• Version compatibility - Different LlamaIndex versions have breaking changes
+
+Agent Integration Problems
+• Generic responses - Agents default to general knowledge instead of using RAG documents
+• Tool usage failures - Agents don't automatically use query tools without explicit prompting
+• Context management - Complex workflow context handling with unclear documentation
+
+Session Management Issues
+• HTTP session leaks - HuggingFace clients don't close properly, causing memory issues
+• Async cleanup problems - Background tasks create uncaught exceptions
+• Resource management - No built-in cleanup mechanisms for external API clients
+
+Provider & Model Complexity
+• Payment traps - Easy to accidentally hit paid providers (provider="auto" routes to paid services)
+• Provider inconsistency - Different providers have different interfaces and limitations
+• Model fallback issues - No automatic fallback to free models when paid ones fail
+
+Configuration Overhead
+• Verbose setup - Requires extensive configuration for basic RAG functionality
+• Manual prompt engineering - Need explicit system prompts to force proper tool usage
+• Complex workflow creation - AgentWorkflow setup is not intuitive
+
+Documentation & Examples
+• Outdated examples - Many tutorials use deprecated import paths
+• Missing error handling - Examples don't show proper async session management
+• Unclear best practices - No clear guidance on agent vs. direct query engine usage
+
+Performance & Reliability
+• Silent failures - Agents may work but not use intended data sources
+• Session buildup - Multiple queries can cause session conflicts
+• Memory leaks - Improper cleanup leads to resource accumulation
+
+Bottom Line: LlamaIndex is powerful but requires significant boilerplate code and careful configuration to work reliably in production environments.
+
 See tutorial https://huggingface.co/learn/agents-course/en/unit2/llama-index/introduction
 
-Code has been updated to follow pythonic async/await pattern.
+Notes on repo:
+- Code has been updated from the tutorial to follow pythonic async/await pattern.
+- Used Augment Code as the code copilot.
 
 ## Setup
 

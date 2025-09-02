@@ -78,8 +78,6 @@ from llama_index.core.tools import QueryEngineTool
 from llama_index.core.agent.workflow import AgentWorkflow
 from llama_index.core.workflow import Context
 from llama_index.core.agent import ReActAgent
-# from llama_index.core.utils import draw_all_possible_flows
-
 
 # Configure logging
 logging.basicConfig(
@@ -523,12 +521,6 @@ Remember: You have access to actual compliance documents through the document_qu
                 agents=[query_agent],
                 root_agent="query_agent",
             )
-
-            # Draw workflow diagram if utilities are available
-            # try:
-            #     draw_all_possible_flows(agent, "flow.html")
-            # except:
-            #     logger.info("Workflow visualization not available)")
 
             logger.info("Agent workflow initialized successfully!")
         except Exception as e:
