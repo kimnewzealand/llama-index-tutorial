@@ -128,12 +128,9 @@ Use Python 3.13
     5. Create a new token with "read" permissions
     6. Copy the token and paste it in your `.env` file
 
-4. Create the tables:
-    ```bash
-    py tables.py
-    ```
+```
 
-5. Run the agent:
+4. Run the agent:
     ```bash
     py main.py
     ```
